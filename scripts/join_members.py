@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the two grid members on the Grid Master and bring them into service.
+"""Create the grid member(s) on the Grid Master and bring them into service.
 
 Two phases, because a member can only be built once the Grid Master has issued it
 a join token:

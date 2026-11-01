@@ -13,7 +13,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# The two grid members. They are a separate stage because each needs a join token
+# The grid member(s). A separate stage because each needs a join token
 # and the Grid Master's certificate, and only a running Grid Master can issue
 # those. scripts/join_members.py prepare creates the member objects on the grid,
 # collects the tokens and writes members.auto.tfvars.json, which this stage reads.

@@ -29,7 +29,7 @@ def terraform_branches():
 def test_member_names_and_addresses_agree():
     text = (VARS / "scopes.yml").read_text()
     defaults = dict(re.findall(r"NIOS_MEMBER(\d)_NAME'\) \| default\('([^']+)'", text))
-    assert defaults == {"1": cfg.MEMBERS[0]["name"], "2": cfg.MEMBERS[1]["name"]}
+    assert defaults == {str(i): m["name"] for i, m in enumerate(cfg.MEMBERS, 1)}
 
     tf = (REPO / "terraform" / "01-members" / "variables.tf").read_text()
     ips = dict(re.findall(r'(member\d)\s*=\s*\{\s*ip\s*=\s*"([^"]+)"', tf))

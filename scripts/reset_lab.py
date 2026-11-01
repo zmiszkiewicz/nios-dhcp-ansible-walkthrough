@@ -4,7 +4,7 @@
   python3 reset_lab.py 2|3|4|5|all
 
   2  remove the branch networks, ranges, leases, the printer reservation and the
-     extensible attribute definitions (back to a bare grid with two members)
+     extensible attribute definitions (back to a bare grid with its member)
   3  delete the exported files in ansible/out
   4  remove mac.txt and C:\\legacy from the wake-up servers
   5  put the printer's reservation back on its original MAC and clear the logs

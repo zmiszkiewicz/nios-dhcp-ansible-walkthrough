@@ -17,8 +17,6 @@ ea_definitions:
 dhcp_members:
   member1:
     host_name: "{{ lookup('ansible.builtin.env', 'NIOS_MEMBER1_NAME') | default('nios-member1.lab.test', true) }}"
-  member2:
-    host_name: "{{ lookup('ansible.builtin.env', 'NIOS_MEMBER2_NAME') | default('nios-member2.lab.test', true) }}"
 
 scopes:
   # Branch 1 has no WakeUp_Server value: its server is found by convention,
@@ -36,7 +34,7 @@ scopes:
   - network: 10.100.12.0/24
     range_start: 10.100.12.100
     range_end: 10.100.12.200
-    member: member2
+    member: member1
     comment: "{{ lab_company }} branch BR-1002"
     extattrs:
       Branch: BR-1002

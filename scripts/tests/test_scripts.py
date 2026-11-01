@@ -44,7 +44,7 @@ def test_prepare_creates_members_tokens_and_cloud_init(api, grid, tmp_path):
         assert obj["pre_provisioning"]["licenses"] == cfg.MEMBER_LICENSES
 
     user_data = json.loads(out.read_text())["member_cloud_init"]
-    assert set(user_data) == {"member1", "member2"}
+    assert set(user_data) == {m["key"] for m in cfg.MEMBERS}
     first = user_data["member1"]
     assert first.startswith("#infoblox-config\n")
     assert f"temp_license: {cfg.MEMBER_TEMP_LICENSE}" in first
@@ -52,7 +52,6 @@ def test_prepare_creates_members_tokens_and_cloud_init(api, grid, tmp_path):
     assert "  token: token-" in first
     assert "    -----BEGIN CERTIFICATE-----" in first
     assert 'default_admin_password: "test"' in first
-    assert user_data["member1"] != user_data["member2"]       # each member has its own token
     assert oct(out.stat().st_mode & 0o777) == "0o600"          # it holds join tokens
 
 
@@ -92,7 +91,7 @@ def test_wait_fails_clearly_when_a_member_never_joins(api, tmp_path):
 
 def make_scopes(api):
     for index, net in enumerate(("10.100.11", "10.100.12", "10.100.13")):
-        member = cfg.MEMBERS[index % 2]
+        member = cfg.MEMBERS[0]
         api.post("network", {"network": f"{net}.0/24", "extattrs": {"Branch": {"value": f"BR-100{index + 1}"}}})
         api.post("range", {"network": f"{net}.0/24", "start_addr": f"{net}.100", "end_addr": f"{net}.200",
                            "server_association_type": "MEMBER",
@@ -107,7 +106,7 @@ def test_lease_plan_reads_scope_to_member_from_the_grid(api, grid):
     assert [p["network"] for p in plan] == ["10.100.11.0/24", "10.100.12.0/24", "10.100.13.0/24"]
     assert [p["scope_index"] for p in plan] == [1, 2, 3]
     assert [p["relay_ip"] for p in plan] == ["10.100.11.20", "10.100.12.20", "10.100.13.20"]
-    assert [p["server_ip"] for p in plan] == ["10.100.0.21", "10.100.0.22", "10.100.0.21"]
+    assert [p["server_ip"] for p in plan] == ["10.100.0.21"] * 3      # one member serves every branch
     assert plan[0]["hostname_prefix"] == "br1001-pc" and plan[0]["count"] == 7
 
 

@@ -23,16 +23,18 @@ GM_LAN1_IP = _env("GM_LAN1_IP", "10.100.0.11")      # the grid VIP members join
 GRID_NETMASK = _env("GRID_NETMASK", "255.255.255.0")
 GRID_GATEWAY = _env("GRID_GATEWAY", "10.100.0.1")
 
+# One member serves all three branches (the vCPU budget allows one 4-vCPU member). To add a
+# second, add an entry here (name nios-member2.lab.test, ip 10.100.0.22), a member2 entry in
+# terraform/01-members/variables.tf and in ansible/inventory/group_vars/all/scopes.yml.
 MEMBERS = [
     {"key": "member1", "name": _env("NIOS_MEMBER1_NAME", "nios-member1.lab.test"),
      "ip": _env("NIOS_MEMBER1_IP", "10.100.0.21")},
-    {"key": "member2", "name": _env("NIOS_MEMBER2_NAME", "nios-member2.lab.test"),
-     "ip": _env("NIOS_MEMBER2_IP", "10.100.0.22")},
 ]
 
 # The hardware model a member is pre-provisioned as, and the matching temporary
-# license written into its cloud-init. The Grid Master runs IB-V825.
-MEMBER_HWTYPE = _env("NIOS_MEMBER_HWTYPE", "IB-V926")
+# license written into its cloud-init. The same model as the Grid Master (IB-V825),
+# which is known to run on this AMI at the member's size (m5.xlarge).
+MEMBER_HWTYPE = _env("NIOS_MEMBER_HWTYPE", "IB-V825")
 MEMBER_LICENSES = ["dns", "dhcp", "enterprise", "nios"]
 MEMBER_TEMP_LICENSE = _env(
     "NIOS_MEMBER_TEMP_LICENSE", f"nios {MEMBER_HWTYPE} enterprise dns dhcp cloud")

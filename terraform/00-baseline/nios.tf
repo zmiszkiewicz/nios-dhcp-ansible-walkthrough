@@ -1,5 +1,5 @@
 # NIOS Grid Master. Same image, license string and two-interface layout the other
-# Infoblox labs use. The two grid members are a separate stage (01-members):
+# Infoblox labs use. The grid member is a separate stage (01-members):
 # a member can only be created once the Grid Master is up and has issued it a
 # join token.
 

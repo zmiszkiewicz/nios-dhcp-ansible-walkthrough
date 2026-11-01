@@ -87,7 +87,7 @@ def test_create_scopes_builds_the_grid_and_is_idempotent(lab):
     assert "WakeUp_Server" not in nets["10.100.11.0/24"]["extattrs"]
     ranges = {r["network"]: r for r in grid.of_type("range")}
     assert ranges["10.100.11.0/24"]["member"] == {"_struct": "dhcpmember", "name": cfg.MEMBERS[0]["name"]}
-    assert ranges["10.100.12.0/24"]["member"]["name"] == cfg.MEMBERS[1]["name"]
+    assert all(r["member"]["name"] == cfg.MEMBERS[0]["name"] for r in ranges.values())
     assert ranges["10.100.13.0/24"]["server_association_type"] == "MEMBER"
     # and the lab's own check agrees
     from nios_wapi import NiosWapi

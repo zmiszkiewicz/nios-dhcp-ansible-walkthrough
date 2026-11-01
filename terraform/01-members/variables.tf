@@ -15,9 +15,9 @@ variable "member_ami_id" {
 }
 
 variable "member_instance_type" {
-  description = "Member size (2 vCPU). If a member refuses its hardware model at this size, see the README troubleshooting table."
+  description = "Member size (4 vCPU, the size the Grid Master runs at with the same hardware model)."
   type        = string
-  default     = "m5.large"
+  default     = "m5.xlarge"
 }
 
 variable "members" {
@@ -27,7 +27,6 @@ variable "members" {
   }))
   default = {
     member1 = { ip = "10.100.0.21" }
-    member2 = { ip = "10.100.0.22" }
   }
 }
 

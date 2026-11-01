@@ -39,7 +39,7 @@ legacy/
   samples/                   an Export-Csv sample and the file the original pipeline makes from it
 terraform/
   00-baseline/               VPC, Grid Master, two Windows wake-up servers, branch simulator
-  01-members/                the two grid members (needs join tokens from a running Grid Master)
+  01-members/                the grid member (needs join tokens from a running Grid Master)
 scripts/                     lab helpers: WAPI client, member join, lease generator, checks, reset, tests
 solutions/                   the inputs challenge 5 uses, for the track's Solve buttons
 requirements.txt             Python packages, pinned
@@ -52,7 +52,7 @@ The track's setup script clones this repo (`main` by default; set `LAB_REPO_REF`
 Challenge 1's setup then:
 
 1. waits for the Grid Master (`scripts/wait_for_grid.py`, polling, not a fixed sleep);
-2. creates the two members on the grid and writes their cloud-init (`scripts/join_members.py prepare`);
+2. creates the member on the grid and writes its cloud-init (`scripts/join_members.py prepare`);
 3. applies `terraform/01-members`, then waits for them to join and switches their DHCP service on (`join_members.py wait`);
 4. writes the Ansible inventory from the Terraform outputs (`scripts/make_inventory.py`);
 5. prepares the branch simulator (`scripts/prepare_simulator.sh`) and waits for WinRM on both Windows servers.
