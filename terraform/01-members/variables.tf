@@ -21,12 +21,13 @@ variable "member_instance_type" {
 }
 
 variable "members" {
-  description = "Grid members and their LAN1 addresses in the grid subnet. Keep in step with scripts/lab_config.py."
+  description = "Grid members and their LAN1 and MGMT addresses in the grid subnet. Keep in step with scripts/lab_config.py."
   type = map(object({
-    ip = string
+    ip      = string # LAN1
+    mgmt_ip = string # MGMT
   }))
   default = {
-    member1 = { ip = "10.100.0.21" }
+    member1 = { ip = "10.100.0.21", mgmt_ip = "10.100.0.20" }
   }
 }
 

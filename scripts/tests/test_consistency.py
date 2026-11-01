@@ -32,11 +32,12 @@ def test_member_names_and_addresses_agree():
     assert defaults == {str(i): m["name"] for i, m in enumerate(cfg.MEMBERS, 1)}
 
     tf = (REPO / "terraform" / "01-members" / "variables.tf").read_text()
-    ips = dict(re.findall(r'(member\d)\s*=\s*\{\s*ip\s*=\s*"([^"]+)"', tf))
-    assert ips == {m["key"]: m["ip"] for m in cfg.MEMBERS}
+    ips = {k: (ip, mgmt) for k, ip, mgmt in re.findall(
+        r'(member\d)\s*=\s*\{\s*ip\s*=\s*"([^"]+)",\s*mgmt_ip\s*=\s*"([^"]+)"', tf)}
+    assert ips == {m["key"]: (m["ip"], m["mgmt_ip"]) for m in cfg.MEMBERS}
 
     grid_net = ipaddress.ip_network("10.100.0.0/24")
-    assert all(ipaddress.ip_address(m["ip"]) in grid_net for m in cfg.MEMBERS)
+    assert all(ipaddress.ip_address(m[k]) in grid_net for m in cfg.MEMBERS for k in ("ip", "mgmt_ip"))
     assert ipaddress.ip_address(cfg.GM_LAN1_IP) in grid_net
 
 
@@ -131,3 +132,12 @@ def test_security_group_descriptions_use_only_characters_aws_accepts():
                 if not allowed.match(desc):
                     bad.append((tf.name, desc))
     assert not bad, bad
+
+
+def test_vnios_instances_have_mgmt_then_lan1_interfaces():
+    """On AWS a vNIOS VM's first interface is MGMT and its second is LAN1. A member with one
+    interface fell back to 192.168.1.2 and aborted startup on a live boot."""
+    for path, instance in (("terraform/00-baseline/nios.tf", "gm"), ("terraform/01-members/main.tf", "member")):
+        text = (REPO / path).read_text()
+        block = re.search(rf'resource "aws_instance" "{instance}" \{{(.*?)\n\}}\n', text, re.S).group(1)
+        assert re.findall(r"device_index\s*=\s*(\d)", block) == ["0", "1"], path

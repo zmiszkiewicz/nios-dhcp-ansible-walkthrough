@@ -28,8 +28,12 @@ GRID_GATEWAY = _env("GRID_GATEWAY", "10.100.0.1")
 # terraform/01-members/variables.tf and in ansible/inventory/group_vars/all/scopes.yml.
 MEMBERS = [
     {"key": "member1", "name": _env("NIOS_MEMBER1_NAME", "nios-member1.lab.test"),
-     "ip": _env("NIOS_MEMBER1_IP", "10.100.0.21")},
+     "ip": _env("NIOS_MEMBER1_IP", "10.100.0.21"),                 # LAN1: serves DHCP, joins the grid
+     "mgmt_ip": _env("NIOS_MEMBER1_MGMT_IP", "10.100.0.20")},     # MGMT
 ]
+# On AWS a vNIOS VM's first network interface is MGMT and its second is LAN1, so a member needs
+# both (like the Grid Master). A single interface carrying LAN1 settings leaves NIOS without a
+# LAN1 and it falls back to its factory address (192.168.1.2) and aborts startup.
 
 # The hardware model a member is pre-provisioned as, and the matching temporary
 # license written into its cloud-init. The same model as the Grid Master (IB-V825),

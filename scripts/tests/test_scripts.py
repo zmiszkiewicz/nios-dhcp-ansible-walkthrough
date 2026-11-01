@@ -51,6 +51,9 @@ def test_prepare_creates_members_tokens_and_cloud_init(api, grid, tmp_path):
     assert f"  ip_addr: {cfg.GM_LAN1_IP}" in first            # joins over the private VIP
     assert "  token: token-" in first
     assert "    -----BEGIN CERTIFICATE-----" in first
+    parsed = __import__("yaml").safe_load(first)
+    assert parsed["lan1"]["v4_addr"] == cfg.MEMBERS[0]["ip"]            # LAN1 serves DHCP
+    assert parsed["mgmt"]["v4_addr"] == cfg.MEMBERS[0]["mgmt_ip"]       # and MGMT is configured too
     assert 'default_admin_password: "test"' in first
     assert oct(out.stat().st_mode & 0o777) == "0o600"          # it holds join tokens
 

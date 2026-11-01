@@ -30,13 +30,22 @@ locals {
   key_name  = data.terraform_remote_state.baseline.outputs.key_name
 }
 
-# LAN1 only. A member with a single interface uses it as LAN1.
+# Two interfaces, as on the Grid Master: on AWS the first one (device 0) is MGMT and the second
+# (device 1) is LAN1. A single interface leaves NIOS without a LAN1 and it fails to start.
+resource "aws_network_interface" "member_mgmt" {
+  for_each        = var.members
+  subnet_id       = local.subnet_id
+  private_ips     = [each.value.mgmt_ip]
+  security_groups = [local.sg_id]
+  tags            = { Name = "${var.name_prefix}-${each.key}-mgmt" }
+}
+
 resource "aws_network_interface" "member" {
   for_each        = var.members
   subnet_id       = local.subnet_id
   private_ips     = [each.value.ip]
   security_groups = [local.sg_id]
-  tags            = { Name = "${var.name_prefix}-${each.key}" }
+  tags            = { Name = "${var.name_prefix}-${each.key}-lan1" }
 }
 
 resource "aws_instance" "member" {
@@ -46,8 +55,12 @@ resource "aws_instance" "member" {
   key_name      = local.key_name
 
   network_interface {
-    network_interface_id = aws_network_interface.member[each.key].id
+    network_interface_id = aws_network_interface.member_mgmt[each.key].id
     device_index         = 0
+  }
+  network_interface {
+    network_interface_id = aws_network_interface.member[each.key].id
+    device_index         = 1
   }
 
   user_data = var.member_cloud_init[each.key]
