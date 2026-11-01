@@ -188,10 +188,12 @@ def wait(api, timeout, interval):
             log(f"no member:dhcpproperties object for {member['name']}", ok=False)
             failures += 1
             continue
-        if not wait_dhcp_working(api, member, 300, interval):
-            # Not fatal: the status vocabulary is confirmed only on a live grid, and
-            # the lease check that follows is the real proof the service works.
-            print(f"  (could not confirm DHCP WORKING on {member['name']} from node_info; continuing)")
+        if not wait_dhcp_working(api, member, 90, interval):
+            # Not fatal: the lease check in challenge 2 is the real proof the service works. Show
+            # every status the grid reports so the name NIOS uses for the DHCP service can be seen.
+            obj = api.first("member", params={"host_name": member["name"]}, fields=["node_info"])
+            print(f"  (no DHCP service reported as WORKING on {member['name']}; continuing. "
+                  f"Statuses seen: {service_statuses(obj or {})})")
     return 1 if failures else 0
 
 
