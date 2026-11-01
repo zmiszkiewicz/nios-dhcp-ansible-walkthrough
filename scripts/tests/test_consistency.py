@@ -117,3 +117,17 @@ def test_vcpu_budget():
              + 2 * vcpu[default(base, "windows_instance_type")]
              + vcpu[default(base, "sim_instance_type")])
     assert total == 14
+
+
+def test_security_group_descriptions_use_only_characters_aws_accepts():
+    """AWS rejects a security group or rule description outside this set, at plan time
+    (an apostrophe did once). terraform validate does not catch it."""
+    allowed = re.compile(r"^[0-9A-Za-z_ .:/()#,@\[\]+=&;{}!$*-]*$")
+    bad = []
+    for tf in (REPO / "terraform").rglob("*.tf"):
+        text = tf.read_text()
+        for block in re.finditer(r'resource "aws_security_group(?:_rule)?"[^\n]*\{(.*?)\n\}\n', text, re.S):
+            for desc in re.findall(r'^\s*description\s*=\s*"([^"]*)"', block.group(1), re.M):
+                if not allowed.match(desc):
+                    bad.append((tf.name, desc))
+    assert not bad, bad

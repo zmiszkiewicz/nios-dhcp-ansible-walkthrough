@@ -105,7 +105,7 @@ resource "aws_security_group" "lab" {
     cidr_blocks = ["0.0.0.0/0"]
   }
   ingress {
-    description = "RDP to the wake-up servers (through the lab's browser desktop)"
+    description = "RDP to the wake-up servers (through the lab browser desktop)"
     from_port   = 3389
     to_port     = 3389
     protocol    = "tcp"
