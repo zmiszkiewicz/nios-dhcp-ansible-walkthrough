@@ -1,0 +1,44 @@
+---
+# Connection details and settings shared by every playbook. Nothing secret is
+# stored here: credentials are read from the environment (the track exports them;
+# outside the lab, export them yourself).
+#
+#   INFOBLOX_HOST          Grid Master address (host or host:port)
+#   INFOBLOX_USERNAME      defaults to admin
+#   INFOBLOX_PASSWORD      NIOS admin password
+#   INFOBLOX_WAPI_VERSION  defaults to 2.12.3
+#   WINDOWS_ADMIN_PASSWORD password for the wake-up servers (see inventory/lab.yml)
+#   LAB_COMPANY            customer name shown in comments and logs
+
+lab_company: "{{ lookup('ansible.builtin.env', 'LAB_COMPANY') | default('ExampleBank', true) }}"
+
+# Passed to every infoblox.nios_modules module and to the nios_lookup lookup.
+nios_provider:
+  host: "{{ lookup('ansible.builtin.env', 'INFOBLOX_HOST') }}"
+  username: "{{ lookup('ansible.builtin.env', 'INFOBLOX_USERNAME') | default('admin', true) }}"
+  password: "{{ lookup('ansible.builtin.env', 'INFOBLOX_PASSWORD') }}"
+  wapi_version: "{{ lookup('ansible.builtin.env', 'INFOBLOX_WAPI_VERSION') | default('2.12.3', true) }}"
+  validate_certs: false
+
+nios_network_view: default
+
+# Where things are, computed from the playbook that is running (playbooks/ sits
+# one level below ansible/, which sits one level below the repo root).
+lab_ansible_dir: "{{ playbook_dir | dirname }}"
+lab_repo_dir: "{{ lab_ansible_dir | dirname }}"
+
+# --- Workflow A: the wake-up file --------------------------------------------
+# Where the wake-up software on each server reads its MAC list.
+wakeup_file: 'C:\Windows\System32\mac.txt'
+
+# The original script does not delete the "#TYPE ..." and "ClientId" lines of the
+# CSV it exports; it blanks them, so the file starts with two empty lines. Keep 2
+# for a file byte-identical to the original's output, 0 for a clean file.
+mac_legacy_blank_lines: 2
+
+# --- Workflow B: change log ---------------------------------------------------
+# Equivalent of the original's son.txt (IP line, MAC line, appended per change)
+# and a one-line-per-change audit trail.
+reservation_log: "{{ lab_repo_dir }}/logs/reservation-changes.txt"
+reservation_audit_log: "{{ lab_repo_dir }}/logs/reservation-audit.log"
+reservation_default_name: reservation

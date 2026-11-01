@@ -1,0 +1,74 @@
+---
+# Challenge 4 / Workflow A: send each branch's MAC list to its wake-up server.
+#
+#   cd ansible && ansible-playbook playbooks/push_macs.yml
+#   cd ansible && ansible-playbook playbooks/push_macs.yml --tags preview   # show, send nothing
+#
+# Original PowerShell step                              Ansible
+# Get-DHCPServerv4Lease ... | Export-Csv                collect_scopes.yml (NIOS lease lookup)
+# -replace ... (header out, '-' to ':')                 mac.txt.j2 (NIOS already gives aa:bb:...)
+# Remove-Item \\<server>\c$\...\mac.txt                 not needed: the file is replaced in one step
+# robocopy <scope>.txt to the server, then ren          ansible.windows.win_template (WinRM)
+#
+# The work is split in two plays. The first runs on the control node and decides
+# what every server should receive. The second runs on the wake-up servers
+# themselves, so Ansible sends to many of them at once (forks in ansible.cfg).
+#
+# Two scopes may share one wake-up server (branch 3 uses branch 2's). The list
+# sent to a server is then the MACs of all its scopes. The original script would
+# keep only the last scope's list in that case.
+- name: Work out what each wake-up server should receive
+  hosts: localhost
+  gather_facts: false
+  tags: [preview]
+
+  tasks:
+    - name: Build the plan (scopes, wake-up servers, active leases)
+      ansible.builtin.import_tasks: ../tasks/collect_scopes.yml
+
+    - name: Group the MAC lists by the wake-up server that receives them
+      ansible.builtin.set_fact:
+        pushes: "{{ scope_plan | lab_group_macs }}"
+
+    - name: Say which scopes have no wake-up server in the inventory
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.network }} ({{ item.branch }}): wake-up server {{ item.wakeup_server }}
+          is not in the inventory. Nothing is sent for this scope.
+      loop: "{{ pushes.unmapped }}"
+      loop_control:
+        label: "{{ item.network }}"
+
+- name: Send each wake-up server its MAC list
+  hosts: wakeup
+  gather_facts: false
+  vars:
+    my_push: "{{ hostvars['localhost'].pushes.hosts[inventory_hostname] | default({'macs': [], 'scopes': []}) }}"
+
+  tasks:
+    - name: Show what this server will receive
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} <- {{ my_push.macs | length }} MAC addresses, from {{ my_push.scopes | join(', ') or 'no scope' }}"
+      tags: [preview]
+
+    - name: Write mac.txt
+      ansible.windows.win_template:
+        src: "{{ lab_ansible_dir }}/templates/mac.txt.j2"
+        dest: "{{ wakeup_file }}"
+        newline_sequence: "\r\n"
+      vars:
+        mac_list: "{{ my_push.macs }}"
+      when: my_push.scopes | length > 0
+
+    - name: Count the MAC addresses in the file on the server
+      ansible.windows.win_shell: (Get-Content '{{ wakeup_file }}' | Where-Object { $_ }).Count
+      changed_when: false
+      register: counted
+      when: my_push.scopes | length > 0
+
+    - name: Check the server holds exactly the MACs it should
+      ansible.builtin.assert:
+        that: (counted.stdout | trim | int) == (my_push.macs | length)
+        fail_msg: "{{ inventory_hostname }} holds {{ counted.stdout | trim }} MACs, expected {{ my_push.macs | length }}"
+        success_msg: "{{ inventory_hostname }}: {{ counted.stdout | trim }} MAC addresses in {{ wakeup_file }} (scopes {{ my_push.scopes | join(', ') }})"
+      when: my_push.scopes | length > 0

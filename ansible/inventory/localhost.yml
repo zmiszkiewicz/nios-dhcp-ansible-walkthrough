@@ -1,0 +1,12 @@
+---
+# The NIOS modules run on the control node and talk to the Grid Master's WAPI, so
+# "NIOS" is just localhost. The interpreter line makes the modules use the same
+# Python that runs ansible-playbook, which is where infoblox-client is installed.
+#
+# The wake-up servers are a second inventory file, inventory/lab.yml, written by
+# scripts/make_inventory.py (in the lab) or by you (see examples/wakeup-inventory.example.yml).
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: "{{ ansible_playbook_python }}"

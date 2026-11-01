@@ -1,0 +1,9 @@
+# Passwords are never written to a file. Export them instead:
+#
+#   export TF_VAR_nios_admin_password='...'
+#   export TF_VAR_windows_admin_password='...'
+#
+# Everything else has a default. Override here if you need to, for example:
+#
+# aws_region = "eu-central-1"   # the vNIOS AMI below is only known to exist here
+# gm_ami_id  = "ami-0f223da0ec214a840"

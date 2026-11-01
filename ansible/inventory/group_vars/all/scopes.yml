@@ -1,0 +1,62 @@
+---
+# The data that drives challenge 2: three branch scopes, the extensible attributes
+# ("API slots") they carry, and the grid members that serve them. All fictional.
+#
+# Keep the member names and the printer address in step with scripts/lab_config.py
+# and terraform/01-members/variables.tf (scripts/tests/test_consistency.py checks).
+
+# The API slots. Ansible reads these off each network to decide where to send data.
+ea_definitions:
+  - name: Branch
+    comment: Branch identifier. A network without it is not a branch scope.
+  - name: Site
+    comment: Branch site name, for reporting.
+  - name: WakeUp_Server
+    comment: Address of the branch wake-up server. Empty means the .111 convention.
+
+dhcp_members:
+  member1:
+    host_name: "{{ lookup('ansible.builtin.env', 'NIOS_MEMBER1_NAME') | default('nios-member1.lab.test', true) }}"
+  member2:
+    host_name: "{{ lookup('ansible.builtin.env', 'NIOS_MEMBER2_NAME') | default('nios-member2.lab.test', true) }}"
+
+scopes:
+  # Branch 1 has no WakeUp_Server value: its server is found by convention,
+  # <first three octets>.111, exactly as the original script does.
+  - network: 10.100.11.0/24
+    range_start: 10.100.11.100
+    range_end: 10.100.11.200
+    member: member1
+    comment: "{{ lab_company }} branch BR-1001"
+    extattrs:
+      Branch: BR-1001
+      Site: Harbor
+
+  # Branch 2 names its server explicitly (which happens to be the .111 address).
+  - network: 10.100.12.0/24
+    range_start: 10.100.12.100
+    range_end: 10.100.12.200
+    member: member2
+    comment: "{{ lab_company }} branch BR-1002"
+    extattrs:
+      Branch: BR-1002
+      Site: Hillside
+      WakeUp_Server: 10.100.12.111
+
+  # Branch 3 has no server of its own and shares branch 2's. The slot is what
+  # makes that possible; the .111 convention alone would point at a server that
+  # does not exist.
+  - network: 10.100.13.0/24
+    range_start: 10.100.13.100
+    range_end: 10.100.13.200
+    member: member1
+    comment: "{{ lab_company }} branch BR-1003"
+    extattrs:
+      Branch: BR-1003
+      Site: Lakeside
+      WakeUp_Server: 10.100.12.111
+
+# --- The branch printer (Workflow B) ------------------------------------------
+printer_ip: "{{ lookup('ansible.builtin.env', 'PRINTER_IP') | default('10.100.11.60', true) }}"
+printer_name: "{{ lookup('ansible.builtin.env', 'PRINTER_NAME') | default('printer-br1001', true) }}"
+printer_old_mac: "{{ lookup('ansible.builtin.env', 'PRINTER_OLD_MAC') | default('02:00:00:01:f0:01', true) }}"

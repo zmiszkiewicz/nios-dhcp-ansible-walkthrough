@@ -1,0 +1,97 @@
+---
+# Challenge 2: create the three branch DHCP scopes on NIOS and define the API slots.
+#
+#   cd ansible && ansible-playbook playbooks/create_scopes.yml
+#
+# Modules: infoblox.nios_modules nios_extensible_attribute, nios_network,
+# nios_range, nios_restartservices. No raw API calls are needed.
+# The scopes themselves are data: inventory/group_vars/all/scopes.yml.
+- name: Create the branch scopes on NIOS
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Define the extensible attributes that act as API slots
+      infoblox.nios_modules.nios_extensible_attribute:
+        name: "{{ item.name }}"
+        type: STRING
+        comment: "{{ item.comment }}"
+        state: present
+        provider: "{{ nios_provider }}"
+      loop: "{{ ea_definitions }}"
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: Create each branch network, carrying its slot values
+      infoblox.nios_modules.nios_network:
+        network: "{{ item.network }}"
+        network_view: "{{ nios_network_view }}"
+        comment: "{{ item.comment }}"
+        extattrs: "{{ item.extattrs }}"
+        state: present
+        provider: "{{ nios_provider }}"
+      loop: "{{ scopes }}"
+      loop_control:
+        label: "{{ item.network }}"
+
+    - name: Create the DHCP range in each network and assign it to a grid member
+      infoblox.nios_modules.nios_range:
+        network: "{{ item.network }}"
+        network_view: "{{ nios_network_view }}"
+        start_addr: "{{ item.range_start }}"
+        end_addr: "{{ item.range_end }}"
+        member: "{{ dhcp_members[item.member].host_name }}"
+        comment: "{{ item.comment }}"
+        state: present
+        provider: "{{ nios_provider }}"
+      loop: "{{ scopes }}"
+      loop_control:
+        label: "{{ item.network }} -> {{ dhcp_members[item.member].host_name }}"
+
+    - name: Apply the DHCP configuration (restarts the DHCP service only if NIOS needs it)
+      infoblox.nios_modules.nios_restartservices:
+        services:
+          - DHCP
+        provider: "{{ nios_provider }}"
+
+    - name: Read the scopes back from NIOS
+      ansible.builtin.set_fact:
+        created_networks: >-
+          {{ lookup('infoblox.nios_modules.nios_lookup', 'network',
+                    return_fields=['network', 'comment', 'extattrs'],
+                    provider=nios_provider, wantlist=True)
+             | selectattr('extattrs', 'defined')
+             | selectattr('extattrs.Branch', 'defined')
+             | lab_sort_by_ip(attribute='network') }}
+        created_ranges: >-
+          {{ lookup('infoblox.nios_modules.nios_lookup', 'range',
+                    return_fields=['network', 'start_addr', 'end_addr', 'member'],
+                    provider=nios_provider, wantlist=True) }}
+
+    - name: Show what NIOS now holds
+      ansible.builtin.debug:
+        msg: "{{ summary | join('\n') }}"
+      vars:
+        range_by_network: "{{ dict(created_ranges | map(attribute='network') | zip(created_ranges)) }}"
+        rows: >-
+          {%- set out = [] -%}
+          {%- for net in created_networks -%}
+          {%- set rng = range_by_network.get(net.network, {}) -%}
+          {%- set _ = out.append({
+                'network': net.network,
+                'branch': net.extattrs.Branch,
+                'site': net.extattrs.Site | default(''),
+                'wakeup': net.extattrs.WakeUp_Server | default('(not set)'),
+                'range': (rng.start_addr ~ ' - ' ~ rng.end_addr) if rng else '(none)',
+                'member': (rng.member.name if rng and rng.member is mapping else '')
+              }) -%}
+          {%- endfor -%}
+          {{ out }}
+        summary: >-
+          {{ rows | lab_table([
+               {'title': 'NETWORK', 'key': 'network'},
+               {'title': 'BRANCH', 'key': 'branch'},
+               {'title': 'SITE', 'key': 'site'},
+               {'title': 'WAKEUP_SERVER', 'key': 'wakeup'},
+               {'title': 'DHCP RANGE', 'key': 'range'},
+               {'title': 'SERVED BY', 'key': 'member'}]) }}

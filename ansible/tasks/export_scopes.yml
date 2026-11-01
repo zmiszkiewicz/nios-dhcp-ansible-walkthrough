@@ -1,0 +1,40 @@
+---
+# Writes, for each scope in `scope_plan`, into ansible/out/:
+#   <scope>.csv       the lease export in the format Export-Csv gives on the
+#                     Microsoft side (the "#TYPE" line, a "ClientId" header, one
+#                     dash-separated MAC per line)
+#   <scope>.mac.txt   the wake-up file for that scope, the format of mac.txt
+#
+# The CSV is the input of the original script's normalization step, so
+# compare_legacy.yml can run that step on a Windows server and diff its output
+# with <scope>.mac.txt.
+
+- name: Make sure the output folder exists
+  ansible.builtin.file:
+    path: "{{ lab_ansible_dir }}/out"
+    state: directory
+    mode: "0755"
+
+- name: Write the lease export for each scope (Microsoft Export-Csv format)
+  ansible.builtin.template:
+    src: "{{ lab_ansible_dir }}/templates/ms-lease-export.csv.j2"
+    dest: "{{ lab_ansible_dir }}/out/{{ item.scope_id }}.csv"
+    newline_sequence: "\r\n"
+    mode: "0644"
+  vars:
+    mac_list: "{{ item.macs }}"
+  loop: "{{ scope_plan }}"
+  loop_control:
+    label: "{{ item.network }}"
+
+- name: Write the wake-up file for each scope (mac.txt format)
+  ansible.builtin.template:
+    src: "{{ lab_ansible_dir }}/templates/mac.txt.j2"
+    dest: "{{ lab_ansible_dir }}/out/{{ item.scope_id }}.mac.txt"
+    newline_sequence: "\r\n"
+    mode: "0644"
+  vars:
+    mac_list: "{{ item.macs }}"
+  loop: "{{ scope_plan }}"
+  loop_control:
+    label: "{{ item.network }}"

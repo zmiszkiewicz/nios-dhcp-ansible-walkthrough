@@ -1,0 +1,15 @@
+---
+# Installed by the track's setup script and by the README's "run it yourself" steps:
+#   ansible-galaxy collection install -r requirements.yml
+#
+# infoblox.nios_modules   the NIOS modules and the nios_lookup lookup. 1.9.0 is the
+#                         release whose module list and parameters were checked
+#                         against its documentation when this lab was written.
+# ansible.windows         win_template / win_copy / win_shell for the wake-up
+#                         servers. 3.2.0 is the version the ad-migration lab
+#                         already runs with ansible-core 2.18.
+collections:
+  - name: infoblox.nios_modules
+    version: 1.9.0
+  - name: ansible.windows
+    version: 3.2.0

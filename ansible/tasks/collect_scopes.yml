@@ -1,0 +1,72 @@
+---
+# Builds `scope_plan`: one entry per DHCP scope that carries the Branch
+# extensible attribute, with its wake-up server and the MAC addresses of its
+# active leases. Imported by collect_macs.yml, push_macs.yml and compare_legacy.yml
+# so all three work from the same data.
+#
+# Original PowerShell                         This file
+# $sco=(Get-DhcpServerv4Scope).ScopeID        read every network, keep the branch scopes
+# $network + ".111"                           WakeUp_Server slot, else the .111 convention
+# Get-DHCPServerv4Lease -ScopeID $scope       read the ACTIVE leases of each network
+
+- name: Read every network from NIOS
+  ansible.builtin.set_fact:
+    all_networks: >-
+      {{ lookup('infoblox.nios_modules.nios_lookup', 'network',
+                return_fields=['network', 'comment', 'extattrs'],
+                provider=nios_provider, wantlist=True) }}
+
+- name: Keep the networks that carry the Branch extensible attribute
+  ansible.builtin.set_fact:
+    branch_networks: >-
+      {{ all_networks
+         | selectattr('extattrs', 'defined')
+         | selectattr('extattrs.Branch', 'defined')
+         | lab_sort_by_ip(attribute='network') }}
+
+- name: Read the active leases of each branch network
+  ansible.builtin.set_fact:
+    scope_leases: >-
+      {{ scope_leases | default({}) | combine({
+           item.network: lookup('infoblox.nios_modules.nios_lookup', 'lease',
+                                filter={'network': item.network, 'binding_state': 'ACTIVE'},
+                                return_fields=['address', 'hardware', 'network', 'binding_state',
+                                               'client_hostname', 'ends'],
+                                provider=nios_provider, wantlist=True)
+                         | lab_sort_by_ip(attribute='address')
+         }) }}
+  loop: "{{ branch_networks }}"
+  loop_control:
+    label: "{{ item.network }}"
+
+- name: Match wake-up addresses to inventory hosts
+  ansible.builtin.set_fact:
+    wakeup_host_by_ip: >-
+      {{ dict(groups.get('wakeup', [])
+              | map('extract', hostvars, 'wakeup_private_ip')
+              | zip(groups.get('wakeup', []))
+              | list) }}
+
+- name: Resolve each branch's wake-up server and MAC list
+  ansible.builtin.set_fact:
+    scope_plan: "{{ scope_plan | default([]) + [plan_entry] }}"
+  vars:
+    ea_server: "{{ item.extattrs.WakeUp_Server | default('') }}"
+    convention_server: "{{ item.network | lab_convention_wakeup }}"
+    server: "{{ ea_server if ea_server else convention_server }}"
+    plan_entry:
+      network: "{{ item.network }}"
+      scope_id: "{{ item.network | split('/') | first }}"
+      branch: "{{ item.extattrs.Branch }}"
+      site: "{{ item.extattrs.Site | default('') }}"
+      wakeup_server: "{{ server }}"
+      wakeup_source: >-
+        {{ 'convention (.111)' if not ea_server
+           else ('extensible attribute' if ea_server == convention_server
+                 else 'extensible attribute (overrides .111)') }}
+      wakeup_host: "{{ wakeup_host_by_ip[server] | default('') }}"
+      lease_count: "{{ scope_leases[item.network] | length }}"
+      macs: "{{ scope_leases[item.network] | map(attribute='hardware') | map('lower') | unique | list }}"
+  loop: "{{ branch_networks }}"
+  loop_control:
+    label: "{{ item.network }}"

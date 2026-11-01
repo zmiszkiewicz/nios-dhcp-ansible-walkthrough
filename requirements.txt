@@ -1,0 +1,19 @@
+# Python packages for the control node (the Instruqt shell container, or your own).
+# Exact versions, as tested together with ansible-core 2.18.7 on Python 3.12.
+# ansible-core 2.18 needs Python 3.11 or newer on the control node.
+#
+#   python3 -m venv /opt/lab-venv && /opt/lab-venv/bin/pip install -r requirements.txt
+#
+# ansible-core       runs the playbooks (the version the ad-migration lab pins)
+# infoblox-client    required by every infoblox.nios_modules module and lookup
+# pywinrm            WinRM transport for the Windows wake-up servers
+# requests, urllib3  the scripts' WAPI client
+# boto3              Route 53 records for the lab's browser tabs (setup_dns.py)
+# PyYAML             the check scripts read the scope data the playbooks use
+ansible-core==2.18.7
+infoblox-client==0.6.2
+pywinrm==0.5.0
+requests==2.34.2
+urllib3==2.8.0
+boto3==1.43.123
+PyYAML==6.0.3

@@ -1,0 +1,31 @@
+---
+# Example wake-up server inventory for running the playbooks against your own
+# estate. Copy to inventory/lab.yml (any *.yml name in inventory/ works) and edit.
+#
+# Each host needs:
+#   ansible_host       the address the control node connects to
+#   wakeup_private_ip  the address NIOS knows the server by: the value of the
+#                      WakeUp_Server extensible attribute, or <first three octets
+#                      of the scope>.111 when the attribute is not set.
+# They are the same address in production. In the lab the control node is outside
+# the VPC, so ansible_host is the public address and wakeup_private_ip the VPC one.
+#
+# For 188 servers generate this file from your CMDB instead of writing it by hand.
+all:
+  children:
+    wakeup:
+      hosts:
+        wakeup-0001:
+          ansible_host: 10.20.1.111
+          wakeup_private_ip: 10.20.1.111
+        wakeup-0002:
+          ansible_host: 10.20.2.111
+          wakeup_private_ip: 10.20.2.111
+      vars:
+        ansible_connection: winrm
+        ansible_port: 5986
+        ansible_winrm_scheme: https
+        ansible_winrm_transport: basic
+        ansible_winrm_server_cert_validation: ignore
+        ansible_user: "{{ lookup('ansible.builtin.env', 'WINDOWS_ADMIN_USER') | default('Administrator', true) }}"
+        ansible_password: "{{ lookup('ansible.builtin.env', 'WINDOWS_ADMIN_PASSWORD') }}"

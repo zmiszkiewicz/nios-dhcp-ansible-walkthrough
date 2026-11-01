@@ -1,0 +1,167 @@
+---
+# Challenge 5 / Workflow B: a branch device was replaced; give the new device the
+# old device's reserved IP.
+#
+#   cd ansible && ansible-playbook playbooks/replace_reservation.yml \
+#       -e ip=10.100.11.60 -e mac=02:00:00:01:f0:02
+#
+# Original PowerShell                                   Ansible
+# $ipAddress,$macAddress | out-file ... -append         the two log tasks at the end
+# Remove-DhcpServerv4Reservation -IPAddress $ip         nios_fixed_address state: absent
+# Add-DhcpServerv4Reservation -ScopeId $subnet ...      nios_fixed_address state: present
+#
+# The original is handed the scope ($subnet). Here it is found: the playbook
+# looks for the network that contains the IP. If the add fails, the old
+# reservation is put back, so the device is never left without one.
+- name: Replace a DHCP reservation
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Check the inputs
+      ansible.builtin.assert:
+        that:
+          - ip is defined
+          - mac is defined
+          - ip is regex('^([0-9]{1,3}\.){3}[0-9]{1,3}$')
+          - mac is regex('^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$')
+        fail_msg: >-
+          Usage: ansible-playbook playbooks/replace_reservation.yml
+          -e ip=10.100.11.60 -e mac=02:00:00:01:f0:02
+        quiet: true
+
+    - name: Normalize the new MAC (aa:bb:cc:dd:ee:ff, lower case)
+      ansible.builtin.set_fact:
+        new_mac: "{{ mac | lab_normalize_mac }}"
+
+    - name: Find the scope that contains the address
+      ansible.builtin.set_fact:
+        scope: >-
+          {{ lookup('infoblox.nios_modules.nios_lookup', 'network',
+                    return_fields=['network', 'comment', 'extattrs'],
+                    provider=nios_provider, wantlist=True)
+             | lab_containing_network(ip) }}
+
+    - name: Stop if no scope contains the address
+      ansible.builtin.fail:
+        msg: "{{ ip }} is not inside any network on this grid."
+      when: scope is none or scope | length == 0
+
+    - name: Read the reservation on that address now
+      ansible.builtin.set_fact:
+        current: >-
+          {{ lookup('infoblox.nios_modules.nios_lookup', 'fixedaddress',
+                    filter={'ipv4addr': ip},
+                    return_fields=['ipv4addr', 'mac', 'name', 'network', 'comment', 'extattrs'],
+                    provider=nios_provider, wantlist=True)
+             | first | default({}) }}
+
+    - name: Show the current state
+      ansible.builtin.debug:
+        msg:
+          address: "{{ ip }}"
+          scope: "{{ scope.network }}"
+          branch: "{{ scope.extattrs.Branch | default('') }}"
+          reserved_for: "{{ current.mac | default('(no reservation)') }}"
+          new_device: "{{ new_mac }}"
+
+    - name: Replace the reservation
+      when: (current.mac | default('')) != new_mac
+      block:
+        - name: Remove the old reservation
+          infoblox.nios_modules.nios_fixed_address:
+            name: "{{ current.name }}"
+            ipaddr: "{{ ip }}"
+            mac: "{{ current.mac }}"
+            network: "{{ scope.network }}"
+            network_view: "{{ nios_network_view }}"
+            # infoblox.nios_modules 1.9.0 crashes in nios_fixed_address when `options` is
+            # left out (its helper iterates None). An empty list avoids it and changes nothing.
+            options: []
+            state: absent
+            provider: "{{ nios_provider }}"
+          when: current.mac is defined
+
+        - name: Add the reservation for the new device
+          infoblox.nios_modules.nios_fixed_address:
+            name: "{{ current.name | default(reservation_default_name) }}"
+            ipaddr: "{{ ip }}"
+            mac: "{{ new_mac }}"
+            network: "{{ scope.network }}"
+            network_view: "{{ nios_network_view }}"
+            comment: "{{ current.comment | default('Replaced by Ansible') }}"
+            extattrs: "{{ current.extattrs | default({}) }}"
+            # infoblox.nios_modules 1.9.0 crashes in nios_fixed_address when `options` is
+            # left out (its helper iterates None). An empty list avoids it and changes nothing.
+            options: []
+            state: present
+            provider: "{{ nios_provider }}"
+
+        - name: Apply the DHCP configuration (restarts the DHCP service only if NIOS needs it)
+          infoblox.nios_modules.nios_restartservices:
+            services:
+              - DHCP
+            provider: "{{ nios_provider }}"
+
+      rescue:
+        - name: The add failed, so put the old reservation back
+          infoblox.nios_modules.nios_fixed_address:
+            name: "{{ current.name }}"
+            ipaddr: "{{ ip }}"
+            mac: "{{ current.mac }}"
+            network: "{{ scope.network }}"
+            network_view: "{{ nios_network_view }}"
+            comment: "{{ current.comment | default('') }}"
+            extattrs: "{{ current.extattrs | default({}) }}"
+            # infoblox.nios_modules 1.9.0 crashes in nios_fixed_address when `options` is
+            # left out (its helper iterates None). An empty list avoids it and changes nothing.
+            options: []
+            state: present
+            provider: "{{ nios_provider }}"
+          when: current.mac is defined
+
+        - name: Report the failure
+          ansible.builtin.fail:
+            msg: >-
+              Could not give {{ ip }} to {{ new_mac }}.
+              {{ 'The old reservation was restored.' if current.mac is defined else 'There was no old reservation to restore.' }}
+
+    - name: Read the reservation back
+      ansible.builtin.set_fact:
+        after: >-
+          {{ lookup('infoblox.nios_modules.nios_lookup', 'fixedaddress',
+                    filter={'ipv4addr': ip},
+                    return_fields=['ipv4addr', 'mac', 'name', 'network'],
+                    provider=nios_provider, wantlist=True) | first | default({}) }}
+
+    - name: Check the reservation now belongs to the new device
+      ansible.builtin.assert:
+        that: after.mac | default('') == new_mac
+        fail_msg: "{{ ip }} is reserved for {{ after.mac | default('nobody') }}, not {{ new_mac }}"
+        success_msg: "{{ ip }} is now reserved for {{ new_mac }} (was {{ current.mac | default('nobody') }})"
+
+    - name: Record the change
+      when: (current.mac | default('')) != new_mac
+      block:
+        - name: Make sure the log folder exists
+          ansible.builtin.file:
+            path: "{{ reservation_log | dirname }}"
+            state: directory
+            mode: "0755"
+
+        - name: Read the change log so far
+          ansible.builtin.set_fact:
+            log_so_far: "{{ lookup('ansible.builtin.file', reservation_log, errors='ignore', rstrip=False) | default('', true) }}"
+            audit_so_far: "{{ lookup('ansible.builtin.file', reservation_audit_log, errors='ignore', rstrip=False) | default('', true) }}"
+
+        - name: Append the IP and MAC (what the original writes to son.txt)
+          ansible.builtin.copy:
+            dest: "{{ reservation_log }}"
+            content: "{{ log_so_far }}{{ lookup('ansible.builtin.template', lab_ansible_dir ~ '/templates/reservation-changes.txt.j2') }}"
+            mode: "0644"
+
+        - name: Append an audit line (when, who, which scope, old and new MAC)
+          ansible.builtin.copy:
+            dest: "{{ reservation_audit_log }}"
+            content: "{{ audit_so_far }}{{ lookup('ansible.builtin.template', lab_ansible_dir ~ '/templates/reservation-audit.log.j2') }}"
+            mode: "0644"

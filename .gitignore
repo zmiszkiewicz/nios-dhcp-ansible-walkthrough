@@ -1,0 +1,26 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+terraform.tfvars
+
+# Written at run time by the track's lifecycle scripts. members.auto.tfvars.json holds
+# one-time grid join tokens and the NIOS admin password, so it must never be committed.
+*.auto.tfvars
+*.auto.tfvars.json
+*.pem
+.state/
+.env
+
+# Ansible: the inventory the lab generates (it names real addresses), and the files the
+# playbooks write
+ansible/inventory/lab.yml
+ansible/out/
+logs/
+
+# Python and tests
+__pycache__/
+*.pyc
+.pytest_cache/

@@ -1,0 +1,47 @@
+---
+# Challenge 3: collect the MAC addresses of the active leases in each branch
+# scope, and show them per scope. Nothing is sent anywhere.
+#
+#   cd ansible && ansible-playbook playbooks/collect_macs.yml
+#
+# Writes ansible/out/<scope>.csv (the lease export in Microsoft's format) and
+# ansible/out/<scope>.mac.txt (the file that will go to the wake-up server).
+- name: Collect lease data per scope
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Build the plan (scopes, wake-up servers, active leases)
+      ansible.builtin.import_tasks: ../tasks/collect_scopes.yml
+
+    - name: Write the per-scope export files
+      ansible.builtin.import_tasks: ../tasks/export_scopes.yml
+
+    - name: Show the data structure for the first scope
+      ansible.builtin.debug:
+        msg:
+          network: "{{ scope_plan[0].network }}"
+          branch: "{{ scope_plan[0].branch }}"
+          wakeup_server: "{{ scope_plan[0].wakeup_server }}"
+          wakeup_source: "{{ scope_plan[0].wakeup_source }}"
+          lease_count: "{{ scope_plan[0].lease_count }}"
+          macs: "{{ scope_plan[0].macs[:3] + ['...'] }}"
+      when: scope_plan | length > 0
+
+    - name: Summary per scope
+      ansible.builtin.debug:
+        msg: "{{ (scope_plan | lab_table([
+                   {'title': 'NETWORK', 'key': 'network'},
+                   {'title': 'BRANCH', 'key': 'branch'},
+                   {'title': 'SITE', 'key': 'site'},
+                   {'title': 'WAKE-UP SERVER', 'key': 'wakeup_server'},
+                   {'title': 'FOUND BY', 'key': 'wakeup_source'},
+                   {'title': 'ACTIVE LEASES', 'key': 'lease_count'}])) | join('\n') }}"
+
+    - name: Stop if no branch scope has any lease
+      ansible.builtin.assert:
+        that: scope_plan | map(attribute='lease_count') | map('int') | sum > 0
+        fail_msg: >-
+          NIOS has no active leases in the branch scopes. Bring the clients online
+          first: scripts/bring_clients_online.sh
+        success_msg: "{{ scope_plan | map(attribute='lease_count') | map('int') | sum }} active leases across {{ scope_plan | length }} scopes"

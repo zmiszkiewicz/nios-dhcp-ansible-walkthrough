@@ -1,0 +1,8 @@
+# The sample files are compared byte for byte (CRLF line endings, as Windows PowerShell writes
+# them), so git must never rewrite them.
+legacy/samples/* -text
+
+# Scripts run on Linux; keep LF even if checked out on Windows.
+*.sh text eol=lf
+*.py text eol=lf
+terraform/00-baseline/linux-init.sh text eol=lf

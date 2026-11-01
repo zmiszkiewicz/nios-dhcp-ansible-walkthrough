@@ -1,0 +1,23 @@
+---
+# Sets the scene for challenge 5: the branch printer has a reserved address.
+# Run by the challenge's setup script; safe to run again.
+#
+#   cd ansible && ansible-playbook playbooks/seed_printer.yml
+- name: Reserve the branch printer's address
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Reserve the printer's address for its current MAC
+      infoblox.nios_modules.nios_fixed_address:
+        name: "{{ printer_name }}"
+        ipaddr: "{{ printer_ip }}"
+        mac: "{{ printer_old_mac }}"
+        network: "{{ scopes[0].network }}"
+        network_view: "{{ nios_network_view }}"
+        comment: "{{ lab_company }} branch printer"
+        # infoblox.nios_modules 1.9.0 crashes in nios_fixed_address when `options` is
+        # left out (its helper iterates None). An empty list avoids it and changes nothing.
+        options: []
+        state: present
+        provider: "{{ nios_provider }}"

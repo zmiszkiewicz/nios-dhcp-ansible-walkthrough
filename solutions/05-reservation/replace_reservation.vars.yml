@@ -1,0 +1,6 @@
+---
+# The two inputs a presenter gives replace_reservation.yml in challenge 5:
+# the reserved IP of the failed device, and the MAC of its replacement.
+# solve.sh passes this file with  -e @solutions/05-reservation/replace_reservation.vars.yml
+ip: 10.100.11.60
+mac: 02:00:00:01:f0:02

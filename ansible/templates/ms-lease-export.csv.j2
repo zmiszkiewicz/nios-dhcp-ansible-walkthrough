@@ -1,0 +1,5 @@
+#TYPE Selected.Microsoft.Management.Infrastructure.CimInstance
+"ClientId"
+{% for mac in mac_list %}
+"{{ mac | lab_ms_clientid }}"
+{% endfor %}

@@ -1,0 +1,100 @@
+---
+# Challenge 4: prove the Ansible output is identical to the PowerShell output.
+#
+#   cd ansible && ansible-playbook playbooks/compare_legacy.yml
+#
+# There is no Microsoft DHCP server in the lab, so the original script's first
+# step (Get-DhcpServerv4Lease | Export-Csv) cannot run. Everything after it can:
+#   1. write each scope's lease data in the format that step produces (out/<scope>.csv)
+#   2. run the ORIGINAL normalization lines on a Windows server (Windows PowerShell)
+#   3. fetch its output and compare it, byte for byte, with the file Ansible renders
+- name: Write the lease export for each scope
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Build the plan (scopes, wake-up servers, active leases)
+      ansible.builtin.import_tasks: ../tasks/collect_scopes.yml
+    - name: Write the per-scope export files
+      ansible.builtin.import_tasks: ../tasks/export_scopes.yml
+
+- name: Run the original PowerShell normalization on a Windows server
+  hosts: wakeup[0]
+  gather_facts: false
+  vars:
+    legacy_dir: 'C:\legacy'
+    plan: "{{ hostvars['localhost'].scope_plan }}"
+  tasks:
+    - name: Create the working folder
+      ansible.windows.win_file:
+        path: "{{ legacy_dir }}"
+        state: directory
+
+    - name: Copy the original normalization script
+      ansible.windows.win_copy:
+        src: "{{ lab_repo_dir }}/legacy/powershell/Normalize-ScopeExport.ps1"
+        dest: "{{ legacy_dir }}\\Normalize-ScopeExport.ps1"
+
+    - name: Copy each scope's lease export
+      ansible.windows.win_copy:
+        src: "{{ lab_ansible_dir }}/out/{{ item.scope_id }}.csv"
+        dest: "{{ legacy_dir }}\\{{ item.scope_id }}.csv"
+      loop: "{{ plan }}"
+      loop_control:
+        label: "{{ item.scope_id }}"
+
+    - name: Run the original -replace pipeline on each export
+      ansible.windows.win_shell: >-
+        powershell.exe -NoProfile -ExecutionPolicy Bypass
+        -File {{ legacy_dir }}\Normalize-ScopeExport.ps1 -ScopeId {{ item.scope_id }} -Dir {{ legacy_dir }}
+      loop: "{{ plan }}"
+      loop_control:
+        label: "{{ item.scope_id }}"
+      changed_when: true
+
+    - name: Fetch the PowerShell output
+      ansible.builtin.fetch:
+        src: "{{ legacy_dir }}\\{{ item.scope_id }}.txt"
+        dest: "{{ lab_ansible_dir }}/out/legacy/{{ item.scope_id }}.txt"
+        flat: true
+      loop: "{{ plan }}"
+      loop_control:
+        label: "{{ item.scope_id }}"
+
+- name: Compare PowerShell output with Ansible output
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Diff each scope (PowerShell on the left, Ansible on the right)
+      ansible.builtin.command: >-
+        diff -u
+        {{ lab_ansible_dir }}/out/legacy/{{ item.scope_id }}.txt
+        {{ lab_ansible_dir }}/out/{{ item.scope_id }}.mac.txt
+      loop: "{{ scope_plan }}"
+      loop_control:
+        label: "{{ item.scope_id }}"
+      register: diffs
+      changed_when: false
+      failed_when: diffs.rc > 1
+
+    - name: Result per scope
+      ansible.builtin.debug:
+        msg: >-
+          {{ item.item.network }} ({{ item.item.lease_count }} MACs):
+          {{ 'IDENTICAL' if item.rc == 0 else 'DIFFERENT' }}
+      loop: "{{ diffs.results }}"
+      loop_control:
+        label: "{{ item.item.network }}"
+
+    - name: Show the differences, if any
+      ansible.builtin.debug:
+        msg: "{{ item.stdout_lines }}"
+      loop: "{{ diffs.results }}"
+      loop_control:
+        label: "{{ item.item.network }}"
+      when: item.rc != 0
+
+    - name: All scopes must match
+      ansible.builtin.assert:
+        that: diffs.results | map(attribute='rc') | select('ne', 0) | list | length == 0
+        fail_msg: The PowerShell and Ansible files differ. See the diff above.
+        success_msg: "PowerShell and Ansible produced identical files for all {{ diffs.results | length }} scopes"

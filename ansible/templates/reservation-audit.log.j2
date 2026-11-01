@@ -1,0 +1,1 @@
+{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }} ip={{ ip }} scope={{ scope.network }} branch={{ scope.extattrs.Branch | default('-') }} old_mac={{ current.mac | default('none') }} new_mac={{ new_mac }} operator={{ lookup('ansible.builtin.env', 'USER') | default('unknown', true) }}
