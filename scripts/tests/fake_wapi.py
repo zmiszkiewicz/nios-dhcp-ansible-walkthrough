@@ -104,6 +104,9 @@ def make_handler(grid, password):
             payload = json.loads(self.rfile.read(length)) if length else {}
 
             if url.path.startswith("/http_direct_file_io/"):
+                # Like NIOS: a download without this content type is refused with 415.
+                if self.headers.get("Content-Type") != "application/force-download":
+                    return self._send(415, "Unsupported Media Type", content_type="text/plain")
                 return self._send(200, PEM, content_type="text/plain")
             if not url.path.startswith("/wapi/"):
                 return self._send(404, {"text": "not found"})

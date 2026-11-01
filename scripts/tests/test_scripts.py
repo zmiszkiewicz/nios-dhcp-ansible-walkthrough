@@ -206,3 +206,15 @@ def test_inventory_generation(tmp_path, monkeypatch):
 
 def test_flatten_ea():
     assert flatten_ea({"Branch": {"value": "BR-1"}, "Site": "x"}) == {"Branch": "BR-1", "Site": "x"}
+
+
+def test_file_downloads_send_the_content_type_nios_requires(api):
+    """A download without Content-Type: application/force-download gets HTTP 415 from NIOS."""
+    from nios_wapi import WapiError
+    import requests
+    url = f"https://{api.host}/http_direct_file_io/x/cert.pem"
+    assert requests.get(url, auth=("admin", "test"), verify=False).status_code == 415
+    assert "BEGIN CERTIFICATE" in api.raw_get(url)
+    with pytest.raises(WapiError):
+        api.session.auth = ("admin", "wrong")
+        api.raw_get(url)

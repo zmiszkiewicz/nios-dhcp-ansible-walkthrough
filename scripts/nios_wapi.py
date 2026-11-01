@@ -134,7 +134,10 @@ class NiosWapi:
 
     def raw_get(self, url):
         """GET an absolute URL (a WAPI file download) with the same credentials."""
-        resp = self.session.get(url, timeout=self.timeout)
+        # NIOS answers a download GET with 415 unless it carries this content type (the
+        # documented way to fetch a file named by a fileop function such as downloadcertificate).
+        resp = self.session.get(url, headers={"Content-Type": "application/force-download"},
+                                timeout=self.timeout)
         if resp.status_code != 200:
             raise WapiError(f"GET {url}: HTTP {resp.status_code}: {resp.text[:200]}", status=resp.status_code)
         return resp.text
