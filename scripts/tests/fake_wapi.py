@@ -128,6 +128,14 @@ def make_handler(grid, password):
             return self._send(400, {"text": f"unsupported {method} on {target}"})
 
         def _create(self, obj_type, payload):
+            if obj_type == "range" and (payload.get("member") or {}).get("name"):
+                # Like NIOS: a member can only serve a range in a network assigned to that member.
+                network = grid.find("network", network=payload.get("network")) or {}
+                assigned = [m.get("name") for m in network.get("members", [])]
+                if payload["member"]["name"] not in assigned:
+                    return self._send(400, {"code": "Client.Ibap.Data.Conflict", "text":
+                        f"Member {payload['member']['name']} is assigned to the DHCP range, "
+                        "but is not assigned to the selected network"})
             if obj_type == "fixedaddress" and payload.get("mac") in grid.reject_macs:
                 return self._send(400, {"text": "Rejected by the test grid"})
             keys = KEYS.get(obj_type)

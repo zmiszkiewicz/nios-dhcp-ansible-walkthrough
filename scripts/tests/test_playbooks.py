@@ -86,6 +86,7 @@ def test_create_scopes_builds_the_grid_and_is_idempotent(lab):
     assert nets["10.100.12.0/24"]["extattrs"]["WakeUp_Server"] == {"value": "10.100.12.111"}
     assert "WakeUp_Server" not in nets["10.100.11.0/24"]["extattrs"]
     ranges = {r["network"]: r for r in grid.of_type("range")}
+    assert all(n["members"] == [{"_struct": "dhcpmember", "name": cfg.MEMBERS[0]["name"]}] for n in nets.values())
     assert ranges["10.100.11.0/24"]["member"] == {"_struct": "dhcpmember", "name": cfg.MEMBERS[0]["name"]}
     assert all(r["member"]["name"] == cfg.MEMBERS[0]["name"] for r in ranges.values())
     assert ranges["10.100.13.0/24"]["server_association_type"] == "MEMBER"
@@ -208,3 +209,14 @@ def test_push_preview_reports_a_scope_whose_server_is_not_in_the_inventory(lab):
     result = lab("push_macs", "--tags", "preview")
     assert "10.100.12.111" in result.stdout and "is not in the inventory" in result.stdout
     assert "wakeup1 <- 12 MAC addresses" in result.stdout
+
+
+def test_create_scopes_recovers_networks_left_without_a_member(lab):
+    """A first run that stopped at the ranges leaves networks with no member; the next run must fix them."""
+    grid = lab.grid.grid
+    for net in ("10.100.11", "10.100.12", "10.100.13"):
+        grid.add("network", {"network": f"{net}.0/24", "network_view": "default", "members": []})
+    lab("create_scopes")
+    assert all(n["members"] == [{"_struct": "dhcpmember", "name": cfg.MEMBERS[0]["name"]}]
+               for n in grid.of_type("network"))
+    assert len(grid.of_type("range")) == 3

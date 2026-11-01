@@ -95,7 +95,8 @@ def test_wait_fails_clearly_when_a_member_never_joins(api, tmp_path):
 def make_scopes(api):
     for index, net in enumerate(("10.100.11", "10.100.12", "10.100.13")):
         member = cfg.MEMBERS[0]
-        api.post("network", {"network": f"{net}.0/24", "extattrs": {"Branch": {"value": f"BR-100{index + 1}"}}})
+        api.post("network", {"network": f"{net}.0/24", "extattrs": {"Branch": {"value": f"BR-100{index + 1}"}},
+                             "members": [{"_struct": "dhcpmember", "name": member["name"]}]})
         api.post("range", {"network": f"{net}.0/24", "start_addr": f"{net}.100", "end_addr": f"{net}.200",
                            "server_association_type": "MEMBER",
                            "member": {"_struct": "dhcpmember", "name": member["name"]}})
@@ -127,7 +128,8 @@ def test_verify_stages_pass_and_fail_for_the_right_reasons(api, grid):
     scopes = verify_lab.load_vars("scopes.yml")["scopes"]
     for scope in scopes:
         api.post("network", {"network": scope["network"],
-                             "extattrs": {k: {"value": v} for k, v in scope["extattrs"].items()}})
+                             "extattrs": {k: {"value": v} for k, v in scope["extattrs"].items()},
+                             "members": [{"_struct": "dhcpmember", "name": verify_lab.member_name(scope["member"])}]})
         api.post("range", {"network": scope["network"], "start_addr": scope["range_start"],
                            "end_addr": scope["range_end"], "server_association_type": "MEMBER",
                            "member": {"_struct": "dhcpmember", "name": verify_lab.member_name(scope["member"])}})

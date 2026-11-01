@@ -87,13 +87,17 @@ def stage_scopes(api):
         if name not in defined:
             raise Check(f"The '{name}' extensible attribute is not defined. Run: ansible-playbook playbooks/create_scopes.yml")
     for scope in load_vars("scopes.yml")["scopes"]:
-        net = api.first("network", params={"network": scope["network"]}, fields=["extattrs"])
+        net = api.first("network", params={"network": scope["network"]}, fields=["extattrs", "members"])
         if not net:
             raise Check(f"Network {scope['network']} does not exist. Run: ansible-playbook playbooks/create_scopes.yml")
         eas = flatten_ea(net.get("extattrs"))
         for key, want in scope["extattrs"].items():
             if eas.get(key) != want:
                 raise Check(f"{scope['network']} has {key}={eas.get(key)!r}, expected {want!r}.")
+        assigned = [m.get("name") for m in net.get("members") or []]
+        if member_name(scope["member"]) not in assigned:
+            raise Check(f"{scope['network']} is not assigned to {member_name(scope['member'])}. "
+                        "Run: ansible-playbook playbooks/create_scopes.yml")
         rng = api.first("range", params={"network": scope["network"]}, fields=["member", "server_association_type"])
         if not rng or rng.get("start_addr") != scope["range_start"] or rng.get("end_addr") != scope["range_end"]:
             raise Check(f"{scope['network']} has no DHCP range {scope['range_start']} - {scope['range_end']}.")

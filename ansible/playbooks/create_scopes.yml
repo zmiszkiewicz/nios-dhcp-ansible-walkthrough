@@ -28,6 +28,10 @@
         network_view: "{{ nios_network_view }}"
         comment: "{{ item.comment }}"
         extattrs: "{{ item.extattrs }}"
+        # A member can only serve a range in a network that is assigned to it, so the
+        # network is assigned to the member first and the range then inherits that.
+        members:
+          - name: "{{ dhcp_members[item.member].host_name }}"
         state: present
         provider: "{{ nios_provider }}"
       loop: "{{ scopes }}"
