@@ -7,6 +7,9 @@
 #   scripts/preflight.sh
 set -uo pipefail
 
+# Use the lab's virtualenv (ansible-core, requests, ...) whatever PATH this was started with.
+[[ -x /opt/lab-venv/bin/python3 ]] && PATH="/opt/lab-venv/bin:${PATH}"
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${HERE}" || exit 1
 failures=0

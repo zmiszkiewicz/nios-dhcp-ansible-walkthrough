@@ -7,6 +7,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "prepare_simulator.sh"
@@ -27,6 +28,8 @@ def run(tmp_path, owned, state=True):
     # ssh answers the readiness probe, the routing helper and the address listing; scp does nothing
     stub(bin_dir, "ssh", f'case "$*" in *"ip -4 -o addr show"*) printf "{lines}";; esac\nexit 0\n')
     stub(bin_dir, "scp", "exit 0\n")
+    # a python3 that cannot run `-c` code (as one without the lab's packages could not): the script must not need it
+    stub(bin_dir, "python3", f'if [ "$1" = "-c" ]; then exit 1; fi\nexec {sys.executable} "$@"\n')
     state_dir = tmp_path / "state"
     state_dir.mkdir()
     if state:

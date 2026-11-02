@@ -7,6 +7,9 @@
 # Needs SIM_IP (its public address) and LAB_SSH_KEY (the private key Terraform wrote).
 set -euo pipefail
 
+# Use the lab's virtualenv (ansible-core, requests, ...) whatever PATH this was started with.
+[[ -x /opt/lab-venv/bin/python3 ]] && PATH="/opt/lab-venv/bin:${PATH}"
+
 : "${SIM_IP:?SIM_IP is not set (the baseline Terraform output sim_public_ip)}"
 : "${LAB_SSH_KEY:?LAB_SSH_KEY is not set (the baseline Terraform output ssh_key_path)}"
 
@@ -39,13 +42,14 @@ ssh "${SSH_OPTS[@]}" "ubuntu@${SIM_IP}" "sudo /usr/local/sbin/lab-policy-routing
 
 addresses="$(ssh "${SSH_OPTS[@]}" "ubuntu@${SIM_IP}" "ip -4 -o addr show")"
 
-# The relay address of every branch, from the lab state. Failing to read it must fail the
-# script: an empty list would make the check below pass without checking anything.
-relays="$(python3 -c '
-from nios_wapi import load_state
-for branch in load_state("lab").get("branch_relays", {}).values():
-    print(branch["relay_ip"])
-')"
+# The relay address of every branch, from the lab state. An empty list must fail the script:
+# the check below would otherwise pass without checking anything.
+# jq, not Python: this must not depend on which Python (and so which packages) is first on PATH.
+STATE_FILE="${LAB_STATE_DIR:-${HERE}/../.state}/lab.json"
+relays=""
+if [[ -f "${STATE_FILE}" ]]; then
+  relays="$(jq -r '.branch_relays[]?.relay_ip' "${STATE_FILE}")"
+fi
 if [[ -z "${relays}" ]]; then
   echo "FATAL: no branch relay addresses in the lab state. Run: python3 make_inventory.py"
   exit 1

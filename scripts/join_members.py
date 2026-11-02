@@ -164,14 +164,6 @@ def enable_dhcp(api, member):
     return False
 
 
-def wait_dhcp_working(api, member, timeout, interval):
-    def working():
-        obj = api.first("member", params={"host_name": member["name"]}, fields=["node_info"])
-        return any(service == "DHCP" and status == "WORKING"
-                   for service, status in service_statuses(obj or {}))
-    return wait_until(working, timeout, interval, f"DHCP to be WORKING on {member['name']}")
-
-
 def wait(api, timeout, interval):
     failures = 0
     for member in cfg.MEMBERS:
@@ -188,12 +180,9 @@ def wait(api, timeout, interval):
             log(f"no member:dhcpproperties object for {member['name']}", ok=False)
             failures += 1
             continue
-        if not wait_dhcp_working(api, member, 90, interval):
-            # Not fatal: the lease check in challenge 2 is the real proof the service works. Show
-            # every status the grid reports so the name NIOS uses for the DHCP service can be seen.
-            obj = api.first("member", params={"host_name": member["name"]}, fields=["node_info"])
-            print(f"  (no DHCP service reported as WORKING on {member['name']}; continuing. "
-                  f"Statuses seen: {service_statuses(obj or {})})")
+        # node_info does not list a DHCP service for a member (seen on a live grid, even with DHCP
+        # enabled and serving), so there is nothing to wait for. The leases in challenge 2 are the
+        # proof the service works.
     return 1 if failures else 0
 
 

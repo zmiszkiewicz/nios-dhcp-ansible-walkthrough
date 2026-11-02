@@ -11,6 +11,9 @@
 # when part of the work is already done is fine.
 set -euo pipefail
 
+# Use the lab's virtualenv (ansible-core, requests, ...) whatever PATH this was started with.
+[[ -x /opt/lab-venv/bin/python3 ]] && PATH="/opt/lab-venv/bin:${PATH}"
+
 stage="${1:-}"
 if [[ ! "${stage}" =~ ^[2-5]$ ]]; then
   echo "Usage: $0 2|3|4|5"

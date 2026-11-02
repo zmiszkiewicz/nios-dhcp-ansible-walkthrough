@@ -13,6 +13,9 @@
 # Running it again renews the same leases (the client MACs are deterministic).
 set -euo pipefail
 
+# Use the lab's virtualenv (ansible-core, requests, ...) whatever PATH this was started with.
+[[ -x /opt/lab-venv/bin/python3 ]] && PATH="/opt/lab-venv/bin:${PATH}"
+
 : "${SIM_IP:?SIM_IP is not set (the baseline Terraform output sim_public_ip)}"
 : "${LAB_SSH_KEY:?LAB_SSH_KEY is not set (the baseline Terraform output ssh_key_path)}"
 
