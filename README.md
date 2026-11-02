@@ -109,7 +109,7 @@ You do not need the branch simulator or the Terraform: against a real grid the l
 
 - **`nios_fixed_address` in `infoblox.nios_modules` 1.9.0 fails if `options` is left out** (its helper iterates `None`; found
   while testing this lab). Every call here passes `options: []`, which avoids it and changes nothing on the grid.
-- **Only `ACTIVE` leases are collected.** A NIOS lease can be in other states too (the `binding_state` values include `STATIC`,
+- **Only `ACTIVE` leases are collected**, filtered after the query: on WAPI 2.12.3 a lease search cannot filter on `binding_state`. A NIOS lease can be in other states too (the `binding_state` values include `STATIC`,
   `FREE`, `EXPIRED` and `OFFERED`). Microsoft's `Get-DhcpServerv4Lease` has its own rules for reservations; if the wake-up
   lists must include reserved devices, check how your grid reports them and extend the `binding_state` filter in
   `ansible/tasks/collect_scopes.yml`.

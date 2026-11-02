@@ -8,6 +8,10 @@
 # $sco=(Get-DhcpServerv4Scope).ScopeID        read every network, keep the branch scopes
 # $network + ".111"                           WakeUp_Server slot, else the .111 convention
 # Get-DHCPServerv4Lease -ScopeID $scope       read the ACTIVE leases of each network
+#
+# WAPI 2.12.3 cannot search leases by binding_state (HTTP 400, "Field is not searchable"), so
+# the leases of a network are read with binding_state as a returned field and the ACTIVE ones
+# are kept here.
 
 - name: Read every network from NIOS
   ansible.builtin.set_fact:
@@ -29,10 +33,11 @@
     scope_leases: >-
       {{ scope_leases | default({}) | combine({
            item.network: lookup('infoblox.nios_modules.nios_lookup', 'lease',
-                                filter={'network': item.network, 'binding_state': 'ACTIVE'},
+                                filter={'network': item.network},
                                 return_fields=['address', 'hardware', 'network', 'binding_state',
                                                'client_hostname', 'ends'],
                                 provider=nios_provider, wantlist=True)
+                         | selectattr('binding_state', 'equalto', 'ACTIVE')
                          | lab_sort_by_ip(attribute='address')
          }) }}
   loop: "{{ branch_networks }}"

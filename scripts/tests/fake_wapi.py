@@ -120,6 +120,11 @@ def make_handler(grid, password):
             if "/" in target:  # a _ref
                 return self._by_ref(method, target, payload)
             if method == "GET":
+                if target == "lease" and "binding_state" in search:
+                    # WAPI 2.12.3: the field can be returned but not searched.
+                    return self._send(400, {"Error": "AdmConProtoError: Field is not searchable: binding_state",
+                                            "code": "Client.Ibap.Proto",
+                                            "text": "Field is not searchable: binding_state"})
                 found = [d for d in grid.of_type(target) if grid.matches(d, search)]
                 limit = int(query.get("_max_results", 0) or 0)
                 return self._send(200, found[:limit] if limit > 0 else found)

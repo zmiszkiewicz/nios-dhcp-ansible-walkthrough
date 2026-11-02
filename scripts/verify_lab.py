@@ -110,7 +110,9 @@ def stage_scopes(api):
 # --- leases -----------------------------------------------------------------
 
 def active_leases(api, network):
-    leases = api.get("lease", params={"network": network, "binding_state": "ACTIVE"}, fields=["hardware"])
+    # binding_state cannot be searched on WAPI 2.12.3; ask for it and filter here.
+    leases = [lease for lease in api.get("lease", params={"network": network}, fields=["hardware", "binding_state"])
+              if lease.get("binding_state") == "ACTIVE"]
     return sorted(leases, key=lambda lease: ipaddress.ip_address(lease["address"]))
 
 
@@ -186,7 +188,11 @@ def stage_reservation(api, mac=None):
     lines = log.read_text().split() if log.exists() else []
     if lines[-2:] != [cfg.PRINTER_IP, mac]:
         raise Check("The change was not logged in logs/reservation-changes.txt.")
-    lease = api.first("lease", params={"hardware": mac, "binding_state": "ACTIVE"})
+    try:  # informational only: never fail the check over a lease lookup
+        lease = next((l for l in api.get("lease", params={"hardware": mac}, fields=["binding_state"])
+                      if l.get("binding_state") == "ACTIVE"), None)
+    except WapiError:
+        lease = None
     if lease:
         print(f"  (the new device holds a lease on {lease['address']})")
 
